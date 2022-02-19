@@ -10,20 +10,27 @@ import (
 
 const (
 	paddleHeight = 4
+
 	paddleSymbol = 0x2588
 	ballSymbol   = 0x25CF
+
+	initialBallVelocityRow = 1
+	initialBallVelocityCol = 2
 )
 
 var (
-	screen        tcell.Screen
+	screen tcell.Screen
+
 	player1Paddle *GameObject
 	player2Paddle *GameObject
 	ball          *GameObject
-	gameObject    []*GameObject
+
+	gameObject []*GameObject
 )
 
 type GameObject struct {
 	row, col, width, height int
+	velRow, velCol          int
 	symbol                  rune
 }
 
@@ -33,11 +40,12 @@ func main() {
 	inputChan := initUserInput()
 
 	for {
-		drawState()
-		time.Sleep(50 * time.Millisecond)
+		handleUserInput(readInput(inputChan))
 
-		key := readInput(inputChan)
-		handleUserInput(key)
+		updateState()
+		drawState()
+
+		time.Sleep(75 * time.Millisecond)
 	}
 }
 
@@ -57,7 +65,6 @@ func print(row, col, width, height int, ch rune) {
 			screen.SetContent(col+c, row+r, ch, nil, tcell.StyleDefault)
 		}
 	}
-
 }
 
 func initScreen() {
@@ -108,6 +115,8 @@ func initGameState() {
 		col:    screenWidth / 2,
 		width:  1,
 		height: 1,
+		velRow: initialBallVelocityRow,
+		velCol: initialBallVelocityCol,
 		symbol: ballSymbol,
 	}
 
@@ -115,6 +124,16 @@ func initGameState() {
 		player1Paddle, player2Paddle, ball,
 	}
 
+}
+func updateState() {
+	for i := range gameObject {
+		gameObject[i].row += gameObject[i].velRow
+		gameObject[i].col += gameObject[i].velCol
+	}
+
+	if collideWithWall(ball) {
+		ball.velRow = -ball.velRow
+	}
 }
 
 func initUserInput() chan string {
@@ -156,4 +175,10 @@ func handleUserInput(key string) {
 	} else if key == "Down" && player2Paddle.row+player2Paddle.height < screenHeight {
 		player2Paddle.row++
 	}
+}
+
+func collideWithWall(obj *GameObject) bool {
+	_, screenHeight := screen.Size()
+
+	return obj.row+obj.velRow < 0 || obj.row+obj.velRow >= screenHeight
 }
