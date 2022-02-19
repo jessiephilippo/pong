@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/gdamore/tcell"
 )
@@ -10,53 +11,45 @@ import (
 const (
 	paddleHeight = 4
 	paddleSymbol = 0x2588
+	ballSymbol   = 0x25CF
 )
 
 var (
-	player1 *Paddle
-	player2 *Paddle
-	screen  tcell.Screen
+	screen        tcell.Screen
+	player1Paddle *GameObject
+	player2Paddle *GameObject
+	ball          *GameObject
+	gameObject    []*GameObject
 )
 
-type Paddle struct {
+type GameObject struct {
 	row, col, width, height int
+	symbol                  rune
 }
 
 func main() {
 	initScreen()
 	initGameState()
+	inputChan := initUserInput()
 
 	for {
 		drawState()
+		time.Sleep(50 * time.Millisecond)
 
-		switch ev := screen.PollEvent().(type) {
-		case *tcell.EventKey:
-			if ev.Rune() == 'q' {
-				screen.Fini()
-				os.Exit(1)
-			} else if ev.Rune() == 'w' {
-				player1.row--
-			} else if ev.Rune() == 's' {
-				player1.row++
-			} else if ev.Key() == tcell.KeyUp {
-				player2.row--
-			} else if ev.Key() == tcell.KeyDown {
-				player2.row++
-			}
-		}
+		key := readInput(inputChan)
+		handleUserInput(key)
 	}
-
 }
 
 func drawState() {
 	screen.Clear()
-	printPaddle(player1.row, player1.row, player1.width, player1.height, paddleSymbol)
-	printPaddle(player2.row, player2.row, player2.width, player2.height, paddleSymbol)
+	for _, obj := range gameObject {
+		print(obj.row, obj.col, obj.width, obj.height, obj.symbol)
+	}
 	screen.Show()
-
 }
 
-func printPaddle(row, col, width, height int, ch rune) {
+func print(row, col, width, height int, ch rune) {
 	// col = x as
 	// row = y as
 	for r := 0; r < height; r++ {
@@ -94,18 +87,73 @@ func initGameState() {
 	// third int value is the width
 	// fourth int value is the height
 
-	player1 = &Paddle{
+	player1Paddle = &GameObject{
 		row:    paddleStart,
 		col:    0,
 		width:  1,
 		height: paddleHeight,
+		symbol: paddleSymbol,
 	}
 
-	player2 = &Paddle{
+	player2Paddle = &GameObject{
 		row:    paddleStart,
 		col:    screenWidth - 1,
 		width:  1,
 		height: paddleHeight,
+		symbol: paddleSymbol,
 	}
 
+	ball = &GameObject{
+		row:    screenHeight / 2,
+		col:    screenWidth / 2,
+		width:  1,
+		height: 1,
+		symbol: ballSymbol,
+	}
+
+	gameObject = []*GameObject{
+		player1Paddle, player2Paddle, ball,
+	}
+
+}
+
+func initUserInput() chan string {
+	inputChan := make(chan string)
+	go func() {
+		for {
+			switch ev := screen.PollEvent().(type) {
+			case *tcell.EventKey:
+				inputChan <- ev.Name()
+			}
+		}
+	}()
+
+	return inputChan
+}
+
+func readInput(input chan string) string {
+	var key string
+	select {
+	case key = <-input:
+	default:
+		key = ""
+	}
+
+	return key
+}
+
+func handleUserInput(key string) {
+	_, screenHeight := screen.Size()
+	if key == "Rune[q]" {
+		screen.Fini()
+		os.Exit(1)
+	} else if key == "Rune[w]" && player1Paddle.row > 0 {
+		player1Paddle.row--
+	} else if key == "Rune[s]" && player1Paddle.row+player1Paddle.height < screenHeight {
+		player1Paddle.row++
+	} else if key == "Up" && player2Paddle.row > 0 {
+		player2Paddle.row--
+	} else if key == "Down" && player2Paddle.row+player2Paddle.height < screenHeight {
+		player2Paddle.row++
+	}
 }
