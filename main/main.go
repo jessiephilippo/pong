@@ -20,6 +20,7 @@ const (
 
 var (
 	screen tcell.Screen
+	paused bool
 
 	player1Paddle *GameObject
 	player2Paddle *GameObject
@@ -36,35 +37,28 @@ type GameObject struct {
 
 func main() {
 	initScreen()
-	initGameState()
-	inputChan := initUserInput()
+	initGameobjects()
 
-	for {
-		handleUserInput(readInput(inputChan))
+	for !isGameOver() {
+		readUserInput()
 
 		updateState()
 		drawState()
 
 		time.Sleep(75 * time.Millisecond)
 	}
-}
 
-func drawState() {
-	screen.Clear()
-	for _, obj := range gameObject {
-		print(obj.row, obj.col, obj.width, obj.height, obj.symbol)
-	}
+	screenWidth, screenHeight := screen.Size()
+	winner := getWinner()
+	printStringCentered(screenHeight/2-1, screenWidth/2, "Game Over!")
+	printStringCentered(screenHeight/2, screenWidth/2, fmt.Sprintf("%s wins...", winner))
+
 	screen.Show()
-}
 
-func print(row, col, width, height int, ch rune) {
-	// col = x as
-	// row = y as
-	for r := 0; r < height; r++ {
-		for c := 0; c < width; c++ {
-			screen.SetContent(col+c, row+r, ch, nil, tcell.StyleDefault)
-		}
-	}
+	time.Sleep(3 * time.Second)
+
+	screen.Fini()
+
 }
 
 func initScreen() {
@@ -84,7 +78,7 @@ func initScreen() {
 	screen.SetStyle(defStyle)
 }
 
-func initGameState() {
+func initGameobjects() {
 	screenWidth, screenHeight := screen.Size()
 	paddleStart := screenHeight/2 - paddleHeight/2
 
@@ -123,9 +117,25 @@ func initGameState() {
 	gameObject = []*GameObject{
 		player1Paddle, player2Paddle, ball,
 	}
-
 }
+
+func drawState() {
+	if paused {
+		return
+	}
+
+	screen.Clear()
+	for _, obj := range gameObject {
+		printGameobjects(obj.row, obj.col, obj.width, obj.height, obj.symbol)
+	}
+	screen.Show()
+}
+
 func updateState() {
+	if paused {
+		return
+	}
+
 	for i := range gameObject {
 		gameObject[i].row += gameObject[i].velRow
 		gameObject[i].col += gameObject[i].velCol
@@ -134,15 +144,34 @@ func updateState() {
 	if collideWithWall(ball) {
 		ball.velRow = -ball.velRow
 	}
+
+	if collideWithPaddle(ball, player1Paddle) || collideWithPaddle(ball, player2Paddle) {
+		ball.velCol = -ball.velCol
+	}
 }
 
-func initUserInput() chan string {
+func readUserInput() chan string {
 	inputChan := make(chan string)
 	go func() {
 		for {
 			switch ev := screen.PollEvent().(type) {
 			case *tcell.EventKey:
-				inputChan <- ev.Name()
+				_, screenHeight := screen.Size()
+				// inputChan <- ev.Name()
+				if ev.Rune() == 'q' {
+					screen.Fini()
+					os.Exit(1)
+				} else if ev.Rune() == 'w' && player1Paddle.row > 0 {
+					player1Paddle.row--
+				} else if ev.Rune() == 's' && player1Paddle.row+player1Paddle.height < screenHeight {
+					player1Paddle.row++
+				} else if ev.Rune() == 'p' {
+					paused = !paused
+				} else if ev.Key() == tcell.KeyUp && player2Paddle.row > 0 {
+					player2Paddle.row--
+				} else if ev.Key() == tcell.KeyDown && player2Paddle.row+player2Paddle.height < screenHeight {
+					player2Paddle.row++
+				}
 			}
 		}
 	}()
@@ -150,35 +179,53 @@ func initUserInput() chan string {
 	return inputChan
 }
 
-func readInput(input chan string) string {
-	var key string
-	select {
-	case key = <-input:
-	default:
-		key = ""
-	}
-
-	return key
-}
-
-func handleUserInput(key string) {
-	_, screenHeight := screen.Size()
-	if key == "Rune[q]" {
-		screen.Fini()
-		os.Exit(1)
-	} else if key == "Rune[w]" && player1Paddle.row > 0 {
-		player1Paddle.row--
-	} else if key == "Rune[s]" && player1Paddle.row+player1Paddle.height < screenHeight {
-		player1Paddle.row++
-	} else if key == "Up" && player2Paddle.row > 0 {
-		player2Paddle.row--
-	} else if key == "Down" && player2Paddle.row+player2Paddle.height < screenHeight {
-		player2Paddle.row++
-	}
-}
-
 func collideWithWall(obj *GameObject) bool {
 	_, screenHeight := screen.Size()
-
 	return obj.row+obj.velRow < 0 || obj.row+obj.velRow >= screenHeight
+}
+
+func collideWithPaddle(ball *GameObject, paddle *GameObject) bool {
+	var collidesCol bool
+	if ball.col < paddle.col {
+		collidesCol = ball.col+ball.velCol >= paddle.col
+	} else {
+		collidesCol = ball.col+ball.velCol <= paddle.col
+	}
+
+	return collidesCol &&
+		ball.row >= paddle.row &&
+		ball.row < paddle.row+paddle.height
+}
+
+func isGameOver() bool {
+	return getWinner() != ""
+}
+
+func getWinner() string {
+	screenWidth, _ := screen.Size()
+	if ball.col < 0 {
+		return "Player 1"
+	} else if ball.col >= screenWidth {
+		return "Player 2"
+	} else {
+		return ""
+	}
+}
+
+func printGameobjects(row, col, width, height int, ch rune) {
+	// col = x as
+	// row = y as
+	for r := 0; r < height; r++ {
+		for c := 0; c < width; c++ {
+			screen.SetContent(col+c, row+r, ch, nil, tcell.StyleDefault)
+		}
+	}
+}
+
+func printStringCentered(row, col int, str string) {
+	col = col - len(str)/2
+	for _, c := range str {
+		screen.SetContent(col, row, c, nil, tcell.StyleDefault)
+		col += 1
+	}
 }
