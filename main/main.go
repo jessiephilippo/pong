@@ -10,6 +10,9 @@ import (
 
 const (
 	paddleHeight = 4
+	paddleWidth  = 1
+	ballHeight   = 1
+	ballWidth    = 1
 
 	paddleSymbol = 0x2588
 	ballSymbol   = 0x25CF
@@ -50,13 +53,12 @@ func main() {
 
 	screenWidth, screenHeight := screen.Size()
 	winner := getWinner()
+
 	printStringCentered(screenHeight/2-1, screenWidth/2, "Game Over!")
 	printStringCentered(screenHeight/2, screenWidth/2, fmt.Sprintf("%s wins...", winner))
 
 	screen.Show()
-
 	time.Sleep(3 * time.Second)
-
 	screen.Fini()
 
 }
@@ -74,7 +76,7 @@ func initScreen() {
 		os.Exit(1)
 	}
 
-	defStyle := tcell.StyleDefault.Background(tcell.ColorBlack).Foreground(tcell.ColorWhite)
+	defStyle := tcell.StyleDefault.Background(tcell.ColorCornflowerBlue).Foreground(tcell.ColorBlack)
 	screen.SetStyle(defStyle)
 }
 
@@ -91,7 +93,7 @@ func initGameobjects() {
 	player1Paddle = &GameObject{
 		row:    paddleStart,
 		col:    0,
-		width:  1,
+		width:  paddleWidth,
 		height: paddleHeight,
 		symbol: paddleSymbol,
 	}
@@ -99,7 +101,7 @@ func initGameobjects() {
 	player2Paddle = &GameObject{
 		row:    paddleStart,
 		col:    screenWidth - 1,
-		width:  1,
+		width:  paddleWidth,
 		height: paddleHeight,
 		symbol: paddleSymbol,
 	}
@@ -107,8 +109,8 @@ func initGameobjects() {
 	ball = &GameObject{
 		row:    screenHeight / 2,
 		col:    screenWidth / 2,
-		width:  1,
-		height: 1,
+		width:  ballWidth,
+		height: ballHeight,
 		velRow: initialBallVelocityRow,
 		velCol: initialBallVelocityCol,
 		symbol: ballSymbol,
@@ -157,7 +159,6 @@ func readUserInput() chan string {
 			switch ev := screen.PollEvent().(type) {
 			case *tcell.EventKey:
 				_, screenHeight := screen.Size()
-				// inputChan <- ev.Name()
 				if ev.Rune() == 'q' {
 					screen.Fini()
 					os.Exit(1)
@@ -203,9 +204,9 @@ func isGameOver() bool {
 
 func getWinner() string {
 	screenWidth, _ := screen.Size()
-	if ball.col < 0 {
+	if ball.col >= screenWidth {
 		return "Player 1"
-	} else if ball.col >= screenWidth {
+	} else if ball.col < 0 {
 		return "Player 2"
 	} else {
 		return ""
@@ -223,9 +224,8 @@ func printGameobjects(row, col, width, height int, ch rune) {
 }
 
 func printStringCentered(row, col int, str string) {
-	col = col - len(str)/2
 	for _, c := range str {
-		screen.SetContent(col, row, c, nil, tcell.StyleDefault)
+		screen.SetContent(col-len(str)/2, row, c, nil, tcell.StyleDefault.Background(tcell.ColorCornflowerBlue).Foreground(tcell.ColorBlack))
 		col += 1
 	}
 }
