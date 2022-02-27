@@ -152,8 +152,7 @@ func updateState() {
 	}
 }
 
-func readUserInput() chan string {
-	inputChan := make(chan string)
+func readUserInput() {
 	go func() {
 		for {
 			switch ev := screen.PollEvent().(type) {
@@ -176,8 +175,6 @@ func readUserInput() chan string {
 			}
 		}
 	}()
-
-	return inputChan
 }
 
 func collideWithWall(obj *GameObject) bool {
